@@ -1,0 +1,8 @@
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    command:
+      - start
+      - --user=root #default user
+      - --pass=root #default password
+    network_mode: host
