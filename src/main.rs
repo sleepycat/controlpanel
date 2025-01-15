@@ -1,7 +1,7 @@
 use axum::{ routing::get, response::{self, IntoResponse}, Router};
 use async_graphql::{http::GraphiQLSource, Object, EmptyMutation, EmptySubscription, Schema};
 use async_graphql_axum::GraphQL;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, signal};
 
 struct Query;
 
@@ -25,5 +25,31 @@ let schema= Schema::new(Query, EmptyMutation, EmptySubscription);
 
     println!("🚀 Listening on {}!", listener.local_addr().unwrap());
 
-    axum::serve(listener, app.into_make_service()).await.unwrap();
+    axum::serve(listener, app.into_make_service())
+          .with_graceful_shutdown(
+              async {
+            let ctrl_c = async {
+                signal::ctrl_c()
+                    .await
+                    .expect("failed to install Ctrl+C handler");
+                println!("Ctrl+C received, shutting down");
+            };
+
+            let terminate = async {
+                signal::unix::signal(signal::unix::SignalKind::terminate())
+                    .expect("failed to install SIGTERM handler")
+                    .recv()
+                    .await;
+                println!("SIGTERM received, shutting down");
+            };
+
+            tokio::select! {
+                _ = ctrl_c => {},
+                _ = terminate => {},
+            }
+
+            println!("signal received, starting graceful shutdown");
+        }
+          )
+        .await.unwrap();
 }
